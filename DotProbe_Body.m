@@ -1,4 +1,4 @@
-function DotProbe_Training(varargin)
+function DotProbe_Body(varargin)
 %NEEDS UPDATE: Real pics, real trial & block number (which is dependent on
 %pics).
 % 12/21/14: Do you want the NoGo Sound too?  Commented out since it is not
@@ -10,7 +10,7 @@ function DotProbe_Training(varargin)
 global KEY COLORS w wRect XCENTER YCENTER PICS STIM DPT trial pahandle
 
 prompt={'SUBJECT ID' 'Condition' 'Session (1, 2, or 3)' 'Practice? 0 or 1'};
-defAns={'4444' '' '' ''};
+defAns={'4444' '1' '1' '0'};
 
 answer=inputdlg(prompt,'Please input subject info',1,defAns);
 
@@ -57,7 +57,8 @@ STIM.trialdur = 1.250;
 
 %% Find & load in pics
 %find the image directory by figuring out where the .m is kept
-[imgdir,~,~] = fileparts(which('fPics_PlaceHolder.m'));
+%[imgdir,~,~] = fileparts(which('fPics_PlaceHolder.m'));
+[imgdir,~,~] = fileparts(which('MasterPics_PlaceHolder.m'));
 % picratefolder = fullfile(imgdir,'SavingsRatings');
 
 % try
@@ -91,10 +92,10 @@ cd(imgdir);
 
 PICS =struct;
  if COND == 1;                   %Condtion = 1 is food. 
-%     PICS.in.avg = dir('Healthy*');
-%     PICS.in.thin = dir('Unhealthy*');
-    PICS.in.avg = dir('Avg*');
-    PICS.in.thin = dir('Thin*');
+    PICS.in.avg = dir('Healthy*');
+    PICS.in.thin = dir('Unhealthy*');
+%     PICS.in.avg = dir('Avg*');
+%     PICS.in.thin = dir('Thin*');
 %     PICS.in.neut = dir('*water*.jpg');
  elseif COND == 2;               %Condition = 2 is not food (birds/flowers)
      PICS.in.avg = dir('Bird*');
@@ -109,7 +110,7 @@ if isempty(PICS.in.avg) || isempty(PICS.in.thin) %|| isempty(PICS.in.neut)
     error('Could not find pics. Please ensure pictures are found in a folder names IMAGES within the folder containing the .m task file.');
 end
 
-img_mult = STIM.totes/length(PICS.in.avg); %FOR TESTING, UPDATE WHEN ACTUAL PICS PRESENT.
+% img_mult = STIM.totes/length(PICS.in.avg); %FOR TESTING, UPDATE WHEN ACTUAL PICS PRESENT.
 
 
 %% Fill in rest of pertinent info
@@ -117,8 +118,8 @@ DPT = struct;
 
 % probe: Location of probe is left (1) or right (2);
 % img: Whether Avg is on left (1) or right (2);
-% exp: Experimental (1) or control (0) trial.  If control trial, then 'img'
-% dictates whether trial is avg (1) or thin (0);
+% exp: Experimental (1) or control (0) trial.  If control trial (0), then 'img'
+%      dictates whether trial is avg (1) or thin (0);
 [probe, img] = BalanceTrials(80,0,[1 2],[1 2]);
 [probec, imgc] = BalanceTrials(40,0,[1 2],[1 2]);
 probe = [probe; probec];
@@ -126,7 +127,8 @@ img = [img; imgc];
 exp = [ones(80,1); zeros(40,1)];
 
 %Make long list of randomized #s to represent each pic
-piclist = [repmat(randperm(length(PICS.in.avg))',img_mult,1) repmat(randperm(length(PICS.in.thin))',img_mult,1)];
+% piclist = [repmat(randperm(length(PICS.in.avg))',img_mult,1) repmat(randperm(length(PICS.in.thin))',img_mult,1)];
+piclist = [randperm(length(PICS.in.avg),120)' randperm(length(PICS.in.thin),120)'];
 
 %Concatenate these into a long list of trial types.
 % trial_types = [l_r counterprobe signal piclist];
@@ -226,9 +228,9 @@ dpr = 10; %radius of dot probe
 %whose side=1/2 the vertical size of the screen & is vertically centered.
 %The square is then placed 1/10th the width of the screen from the L & R
 %edge.
-STIM.img(1,1:4) = [wRect(3)/15,wRect(4)/4,wRect(3)/15+wRect(4)/2,wRect(4)*(3/4)];               %L - image rect
-STIM.img(2,1:4) = [(wRect(3)*(14/15))-wRect(4)/2,wRect(4)/4,wRect(3)*(14/15),wRect(4)*(3/4)];     %R - image rect
-STIM.probe(1,1:4) = [wRect(3)/4 - dpr,wRect(4)/2 - dpr, wRect(3)/4 + dpr, wRect(4)/2 + dpr];    %L probe rect
+STIM.img(1,1:4) = [wRect(3)/15,wRect(4)/4,wRect(3)/15+wRect(4)/2,wRect(4)*(3/4)];                   %L - image rect
+STIM.img(2,1:4) = [(wRect(3)*(14/15))-wRect(4)/2,wRect(4)/4,wRect(3)*(14/15),wRect(4)*(3/4)];       %R - image rect
+STIM.probe(1,1:4) = [wRect(3)/4 - dpr,wRect(4)/2 - dpr, wRect(3)/4 + dpr, wRect(4)/2 + dpr];        %L probe rect
 STIM.probe(2,1:4) = [wRect(3)*(3/4) - dpr,wRect(4)/2 - dpr, wRect(3)*(3/4) + dpr, wRect(4)/2 + dpr];    %R probe rect
 
 %% Initial screen
@@ -239,7 +241,7 @@ Screen('Flip',w);
 WaitSecs(1);
 
 %% Instructions
-instruct = sprintf('You will see pictures on the left & right side of the screen, followed by a dot on the left or right side of the screen.\n\nPress the "%s" if the dot is on the left side of the screen or "%s" if the dot is on right side of the screen\n\nBUT if you hear a tone when the dot appears, DO NOT PRESS the button.\n\nPress any key to continue.',KbName(KEY.left),KbName(KEY.right));
+instruct = sprintf('You will see pictures on the left & right side of the screen, followed by a dot on the left or right side of the screen.\n\nPress the "%s" if the dot is on the left side of the screen or "%s" if the dot is on right side of the screen\n\nPress any key to continue.',KbName(KEY.left),KbName(KEY.right));
 DrawFormattedText(w,instruct,'center','center',COLORS.WHITE,60,[],[],1.5);
 Screen('Flip',w);
 KbWait();
@@ -495,7 +497,7 @@ Screen('Flip',w);
 WaitSecs(.5);                              %Jitter this for fMRI purposes.
 
 % If this is an experimental trial, display AVG & Thin in appropriate
-% locations. Otherwise, just display them...hence, no additional 
+% locations. Otherwise, just display them...hence, no additional if/thens
     if DPT.var.img(trial,block)== 1;
         %Display AVG pic on LEFT
         Screen('DrawTexture',w,PICS.out(trial).texture_avg,[],STIM.img(lr,:));
@@ -524,19 +526,22 @@ WaitSecs(.5);                              %Jitter this for fMRI purposes.
         if Down == 1 
             if any(find(Code) == corr_respkey);
                 trial_rt = GetSecs() - RT_start;
-            
-                if DPT.var.signal(trial,block) == 1;        %This is a no-go signal round. Throw incorrect X.
-                    DrawFormattedText(w,'X','center','center',COLORS.RED);
-                    Screen('Flip',w);
-                    correct = 0;
-                    WaitSecs(.5);
+                Screen('Flip',w);
+                correct = 1;
 
-                else                                        %If no signal + Press, move on to next round.
-                    Screen('Flip',w);                        %'Flip' in order to clear buffer; next flip (in main script) flips to black screen.
-                    correct = 1;
                 
-                end
-            break    
+% This is for beep NoGo signal
+%                 if DPT.var.signal(trial,block) == 1;        %This is a no-go signal round. Throw incorrect X.
+%                     DrawFormattedText(w,'X','center','center',COLORS.RED);
+%                     Screen('Flip',w);
+%                     correct = 0;
+%                     WaitSecs(.5);
+% 
+%                 else                                        %If no signal + Press, move on to next round.
+%                     Screen('Flip',w);                        %'Flip' in order to clear buffer; next flip (in main script) flips to black screen.
+%                     correct = 1;
+%                 
+%                 end
             
             elseif any(find(Code) == incorr_respkey) %The wrong key was pressed. Throw X regardless of Go/No Go
                 trial_rt = GetSecs() - RT_start;
@@ -557,15 +562,15 @@ WaitSecs(.5);                              %Jitter this for fMRI purposes.
     if correct == -999;
 %     Screen('DrawTexture',w,PICS.out(trial).texture,[],STIM.img(lr,:));
         
-        if DPT.var.signal(trial,block) == 1;    %NoGo Trial + Correct no press. Do nothing, move to inter-trial
-            Screen('Flip',w);                   %'Flip' in order to clear buffer; next flip (in main script) flips to black screen.
-            correct = 1;
-        else                                    %Incorrect no press. Show "X" for .5 sec.
+%         if DPT.var.signal(trial,block) == 1;    %NoGo Trial + Correct no press. Do nothing, move to inter-trial
+%             Screen('Flip',w);                   %'Flip' in order to clear buffer; next flip (in main script) flips to black screen.
+%             correct = 1;
+%         else                                    %Incorrect no press. Show "X" for .5 sec.
             DrawFormattedText(w,'X','center','center',COLORS.RED);
             Screen('Flip',w);
             correct = 0;
             WaitSecs(.5);
-        end
+%         end
         trial_rt = -999;                        %No press = no RT
     end
     
