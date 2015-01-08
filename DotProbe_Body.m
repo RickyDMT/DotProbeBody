@@ -5,6 +5,7 @@ function DotProbe_Body(varargin)
 % 12/21/14: What to do about control trials. Should pics be repeats from main list or
 % separate files all together.
 % 1/5/15: Needs real pics!
+% 1/7/15: HPair5, WPair11 missing Health pic (AKA H034, H035)
 
 global KEY COLORS w wRect XCENTER YCENTER PICS STIM DPB trial pahandle
 
@@ -52,95 +53,77 @@ STIM.blocks = 6;
 STIM.trials = 20;
 STIM.totes = STIM.blocks*STIM.trials;
 STIM.trialdur = 1.250;
+STIM.exp_trials = 80;
+STIM.cont_trials = 40;
 
 
 %% Find & load in pics
 %find the image directory by figuring out where the .m is kept
-%[imgdir,~,~] = fileparts(which('fPics_PlaceHolder.m'));
-[imgdir,~,~] = fileparts(which('MasterPics_PlaceHolder.m'));
-% picratefolder = fullfile(imgdir,'SavingsRatings');
 
-% try
-%     cd(picratefolder)
-% catch
-%     error('Could not find and/or open the image directory.');
-% end
-% 
-% filen = sprintf('PicRate_%03d.mat',ID);
-% try
-%     p = open(filen);
-% catch
-%     warning('Could not find and/or open the rating file.');
-%     commandwindow;
-%     randopics = input('Would you like to continue with a random selection of images? [1 = Yes, 0 = No]');
-%     if randopics == 1
-%         p = struct;
-%         p.PicRating.go = dir('Healthy*');
-%         p.PicRating.no = dir('Unhealthy*');
-%         %XXX: ADD RANDOMIZATION SO THAT SAME 80 IMAGES AREN'T CHOSEN
-%         %EVERYTIME
-%     else
-%         error('Task cannot proceed without images. Contact Erik (elk@uoregon.edu) if you have continued problems.')
-%     end
-%     
-% end
+[imgdir,~,~] = fileparts(which('MasterPics_PlaceHolder.m'));
 
 cd(imgdir);
  
-
-
 PICS =struct;
- if COND == 1;                   %Condtion = 1 is food. 
     % Update for appropriate pictures.
-     PICS.in.avg = dir('Healthy*');
-     PICS.in.thin = dir('Unhealthy*');
-%     PICS.in.avg = dir('Avg*');
-%     PICS.in.thin = dir('Thin*');
-%     PICS.in.neut = dir('*water*.jpg');
- elseif COND == 2;               %Condition = 2 is not food (birds/flowers)
-     PICS.in.avg = dir('Bird*');
-     PICS.in.thin = dir('Flower*');
-%     PICS.in.neut = dir('*mam*.jpg');
- end
-% picsfields = fieldnames(PICS.in);
+     PICS.in.H = dir('H*');
+     PICS.in.T = dir('T*');
 
-%Check if pictures are present. If not, throw error.
+     %Check if pictures are present. If not, throw error.
 %Could be updated to search computer to look for pics...
-if isempty(PICS.in.avg) || isempty(PICS.in.thin) %|| isempty(PICS.in.neut)
+if isempty(PICS.in.H) || isempty(PICS.in.T) %|| isempty(PICS.in.neut)
     error('Could not find pics. Please ensure pictures are found in a folder names IMAGES within the folder containing the .m task file.');
 end
 
-% img_mult = STIM.totes/length(PICS.in.avg); %FOR TESTING, UPDATE WHEN ACTUAL PICS PRESENT.
+% img_mult = STIM.totes/length(PICS.in.H); %FOR TESTING, UPDATE WHEN ACTUAL PICS PRESENT.
 
 
 %% Fill in rest of pertinent info
-DPT = struct;
+DPB = struct;
 
 % probe: Location of probe is left (1) or right (2);
-% img: Whether Avg is on left (1) or right (2);
+% img: Whether H is on left (1) or right (2);
 % exp: Experimental (1) or control (0) trial.  If control trial (0), then 'img'
-%      dictates whether trial is avg (1) or thin (0);
-[probe, img] = BalanceTrials(80,0,[1 2],[1 2]);
-[probec, imgc] = BalanceTrials(40,0,[1 2],[1 2]);
-probe = [probe; probec];
-img = [img; imgc];
-exp = [ones(80,1); zeros(40,1)];
+%      dictates whether trial presents H (1) or T (0) pics;
+[probe, img] = BalanceTrials(STIM.exp_trials,0,[1 2],[1 2]);
+% [probec, imgc] = BalanceTrials(STIM.cont_trials,0,[1 2],[1 2]);
+probe = [probe; repmat([1;2],20,1)];
+img = [img; ones(20,1); repmat(2,20,1)];
+exp = [ones(STIM.exp_trials,1); zeros(STIM.cont_trials,1)];
 
-%Make long list of randomized #s to represent each pic
-% piclist = [repmat(randperm(length(PICS.in.avg))',img_mult,1) repmat(randperm(length(PICS.in.thin))',img_mult,1)];
-piclist = [randperm(length(PICS.in.avg),120)' randperm(length(PICS.in.thin),120)'];
+%Make long list of randomized #s to represent each pic in experimental
+%trials
+%First check to see how many repeats are needed.
+picdiff = STIM.exp_trials - length(PICS.in.H);
+if picdiff == 0;
+    %do nothing, biotch
+    piclist = randperm(length(PICS.in.H))';
+else
+    %start with simple randomized order of each H pic
+    piclist_H = randperm(length(PICS.in.H))';
+    %Then add as many more as needed to reach full 80 trials.
+    piclist = [piclist_H; randi(length(PICS.in.H),picdiff,1)];
 
+end
+
+%Come up with pics for control trials
+piclist = [piclist; randi(length(PICS.in.H),20,1); randi(length(PICS.in.T),20,1)];
+    
+%List pic names!
+
+%Block & trial numbers:
+[b, t] = BalanceTrials(STIM.totes,0,[1:STIM.blocks],[1:STIM.trials]);
 %Concatenate these into a long list of trial types.
-% trial_types = [l_r counterprobe signal piclist];
 trial_types = [probe img exp piclist];
 shuffled = trial_types(randperm(size(trial_types,1)),:);
+trial_types = [b t shuffled];
 
 for g = 1:STIM.blocks;
     row = ((g-1)*STIM.trials)+1;
     rend = row+STIM.trials - 1;
     DPB.var.probe(1:STIM.trials,g) = shuffled(row:rend,1);
-    DPB.var.picnum_avg(1:STIM.trials,g) = shuffled(row:rend,4);
-    DPB.var.picnum_thin(1:STIM.trials,g) = shuffled(row:rend,5);
+    DPB.var.picnum_H(1:STIM.trials,g) = shuffled(row:rend,4);
+    DPB.var.picnum_T(1:STIM.trials,g) = shuffled(row:rend,5);
     DPB.var.img(1:STIM.trials,g) = shuffled(row:rend,2);
     DPB.var.exp(1:STIM.trials,g) = shuffled(row:rend,3);
 end
@@ -256,7 +239,7 @@ if prac == 1;
     
     
     %Load random hi cal & low cal pic
-    rand_prac_pic = randi(length(PICS.in.avg));
+    rand_prac_pic = randi(length(PICS.in.H));
     practpic_lo = imread(getfield(PICS,'in','lo',{rand_prac_pic},'name'));
     practpic_hi = imread(getfield(PICS,'in','hi',{rand_prac_pic},'name'));
     practpic_lo = Screen('MakeTexture',w,practpic_lo);
@@ -370,70 +353,70 @@ for block = 1:STIM.blocks;
     Screen('TextSize',w,old);
     %Inter-block info here, re: Display RT, accuracy, etc.
     %Calculate block RT
-    Screen('Flip',w);   %clear screen first.
-    
-    block_text = sprintf('Block %d Results',block);
-    
-    c = (DPB.data.correct(:,block) == 1);                                 %Find correct trials
-%     corr_count = sprintf('Number Correct:\t%d of %d',length(find(c)),STIM.trials);  %Number correct = length of find(c)
-    corr_per = length(find(c))*100/length(c);                           %Percent correct = length find(c) / total trials
-%     corr_pert = sprintf('Percent Correct:\t%4.1f%%',corr_per);          %sprintf that data to string.
-    
-    if isempty(c(c==1))
-        %Don't try to calculate avg RT, they got them all wrong (WTF?)
-        %Display "N/A" for this block's RT.
-%         ibt_rt = sprintf('Average RT:\tUnable to calculate RT due to 0 correct trials.');
-        fulltext = sprintf('Number Correct:\t%d of %d\nPercent Correct:\t%4.1f%%\nAverage RT:\tUnable to calculate RT due to 0 correct trials.',length(find(c)),STIM.trials,corr_per);
-    else
-        blockrts = DPB.data.rt(:,block);                                %Pull all RT data
-        blockrts = blockrts(c);                                     %Resample RT only if correct & not a no-go trial.
-        DPB.data.avg_rt(block) = fix(mean(blockrts)*1000);                        %Display avg rt in milliseconds.
-%         ibt_rt = sprintf('Average RT:\t\t\t%3d milliseconds',avg_rt_block);
-        fulltext = sprintf('Number Correct:\t%d of %d\nPercent Correct:\t%4.1f%%\nAverage RT:\t\t\t%3d milliseconds',length(find(c)),STIM.trials,corr_per,DPB.data.avg_rt(block));
-    end
-    
-    ibt_xdim = wRect(3)/10;
-    ibt_ydim = wRect(4)/4;
-    
-    %Next lines display all the data.
-    DrawFormattedText(w,block_text,'center',wRect(4)/10,COLORS.WHITE);
-    DrawFormattedText(w,fulltext,ibt_xdim,ibt_ydim,COLORS.WHITE,[],[],[],1.5);
-%     DrawFormattedText(w,corr_count,ibt_xdim,ibt_ydim,COLORS.WHITE);
-%     DrawFormattedText(w,corr_pert,ibt_xdim,ibt_ydim+30,COLORS.WHITE);    
-%     DrawFormattedText(w,ibt_rt,ibt_xdim,ibt_ydim+60,COLORS.WHITE);
+%     Screen('Flip',w);   %clear screen first.
 %     
-    if block > 1
-        % Also display rest of block data summary
-        tot_trial = block * STIM.trials;
-        totes_c = DPB.data.correct == 1;
-%         corr_count_totes = sprintf('Number Correct: \t%d of %d',length(find(totes_c)),tot_trial);
-        corr_per_totes = length(find(totes_c))*100/tot_trial;
-%         corr_pert_totes = sprintf('Percent Correct:\t%4.1f%%',corr_per_totes);
-        
-        if isempty(totes_c(totes_c ==1))
-            %Don't try to calculate RT, they have missed EVERY SINGLE GO
-            %TRIAL! 
-            %Stop task & alert experimenter?
-%             tot_rt = sprintf('Block %d Average RT:\tUnable to calculate RT due to 0 correct trials.',block);
-            fullblocktext = sprintf('Number Correct:\t\t%d of %d\nPercent Correct:\t\t%4.1f%%\nAverage RT:\tUnable to calculate RT due to 0 correct trials.',length(find(totes_c)),tot_trial,corr_per_totes);            
-        else
-            totrts = DPB.data.rt;
-            totrts = totrts(totes_c);
-            avg_rt_tote = fix(mean(totrts)*1000);     %Display in units of milliseconds.
-%             tot_rt = sprintf('Average RT:\t\t\t%3d milliseconds',avg_rt_tote);
-            fullblocktext = sprintf('Number Correct:\t\t%d of %d\nPercent Correct:\t\t%4.1f%%\nAverage RT:\t\t\t%3d milliseconds',length(find(totes_c)),tot_trial,corr_per_totes,avg_rt_tote);
-        end
-        
-        DrawFormattedText(w,'Total Results','center',YCENTER,COLORS.WHITE);
-        DrawFormattedText(w,fullblocktext,ibt_xdim,YCENTER+40,COLORS.WHITE,[],[],[],1.5);
-%         DrawFormattedText(w,corr_count_totes,ibt_xdim,ibt_ydim+150,COLORS.WHITE);
-%         DrawFormattedText(w,corr_pert_totes,ibt_xdim,ibt_ydim+180,COLORS.WHITE);
-%         DrawFormattedText(w,tot_rt,ibt_xdim,ibt_ydim+210,COLORS.WHITE);
+%     block_text = sprintf('Block %d Results',block);
+%     
+%     c = (DPB.data.correct(:,block) == 1);                                 %Find correct trials
+% %     corr_count = sprintf('Number Correct:\t%d of %d',length(find(c)),STIM.trials);  %Number correct = length of find(c)
+%     corr_per = length(find(c))*100/length(c);                           %Percent correct = length find(c) / total trials
+% %     corr_pert = sprintf('Percent Correct:\t%4.1f%%',corr_per);          %sprintf that data to string.
+%     
+%     if isempty(c(c==1))
+%         %Don't try to calculate avg RT, they got them all wrong (WTF?)
+%         %Display "N/A" for this block's RT.
+% %         ibt_rt = sprintf('Average RT:\tUnable to calculate RT due to 0 correct trials.');
+%         fulltext = sprintf('Number Correct:\t%d of %d\nPercent Correct:\t%4.1f%%\nAverage RT:\tUnable to calculate RT due to 0 correct trials.',length(find(c)),STIM.trials,corr_per);
+%     else
+%         blockrts = DPB.data.rt(:,block);                                %Pull all RT data
+%         blockrts = blockrts(c);                                     %Resample RT only if correct & not a no-go trial.
+%         DPB.data.avg_rt(block) = fix(mean(blockrts)*1000);                        %Display avg rt in milliseconds.
+% %         ibt_rt = sprintf('Average RT:\t\t\t%3d milliseconds',avg_rt_block);
+%         fulltext = sprintf('Number Correct:\t%d of %d\nPercent Correct:\t%4.1f%%\nAverage RT:\t\t\t%3d milliseconds',length(find(c)),STIM.trials,corr_per,DPB.data.avg_rt(block));
+%     end
+%     
+%     ibt_xdim = wRect(3)/10;
+%     ibt_ydim = wRect(4)/4;
+%     
+%     %Next lines display all the data.
+%     DrawFormattedText(w,block_text,'center',wRect(4)/10,COLORS.WHITE);
+%     DrawFormattedText(w,fulltext,ibt_xdim,ibt_ydim,COLORS.WHITE,[],[],[],1.5);
+% %     DrawFormattedText(w,corr_count,ibt_xdim,ibt_ydim,COLORS.WHITE);
+% %     DrawFormattedText(w,corr_pert,ibt_xdim,ibt_ydim+30,COLORS.WHITE);    
+% %     DrawFormattedText(w,ibt_rt,ibt_xdim,ibt_ydim+60,COLORS.WHITE);
+% %     
+%     if block > 1
+%         % Also display rest of block data summary
+%         tot_trial = block * STIM.trials;
+%         totes_c = DPB.data.correct == 1;
+% %         corr_count_totes = sprintf('Number Correct: \t%d of %d',length(find(totes_c)),tot_trial);
+%         corr_per_totes = length(find(totes_c))*100/tot_trial;
+% %         corr_pert_totes = sprintf('Percent Correct:\t%4.1f%%',corr_per_totes);
 %         
-        %Test if getting better or worse; display feedback?
-    end
-    
-    DrawFormattedText(w,'Press any key to continue','center',wRect(4)*9/10,COLORS.WHITE);
+%         if isempty(totes_c(totes_c ==1))
+%             %Don't try to calculate RT, they have missed EVERY SINGLE GO
+%             %TRIAL! 
+%             %Stop task & alert experimenter?
+% %             tot_rt = sprintf('Block %d Average RT:\tUnable to calculate RT due to 0 correct trials.',block);
+%             fullblocktext = sprintf('Number Correct:\t\t%d of %d\nPercent Correct:\t\t%4.1f%%\nAverage RT:\tUnable to calculate RT due to 0 correct trials.',length(find(totes_c)),tot_trial,corr_per_totes);            
+%         else
+%             totrts = DPB.data.rt;
+%             totrts = totrts(totes_c);
+%             avg_rt_tote = fix(mean(totrts)*1000);     %Display in units of milliseconds.
+% %             tot_rt = sprintf('Average RT:\t\t\t%3d milliseconds',avg_rt_tote);
+%             fullblocktext = sprintf('Number Correct:\t\t%d of %d\nPercent Correct:\t\t%4.1f%%\nAverage RT:\t\t\t%3d milliseconds',length(find(totes_c)),tot_trial,corr_per_totes,avg_rt_tote);
+%         end
+%         
+%         DrawFormattedText(w,'Total Results','center',YCENTER,COLORS.WHITE);
+%         DrawFormattedText(w,fullblocktext,ibt_xdim,YCENTER+40,COLORS.WHITE,[],[],[],1.5);
+% %         DrawFormattedText(w,corr_count_totes,ibt_xdim,ibt_ydim+150,COLORS.WHITE);
+% %         DrawFormattedText(w,corr_pert_totes,ibt_xdim,ibt_ydim+180,COLORS.WHITE);
+% %         DrawFormattedText(w,tot_rt,ibt_xdim,ibt_ydim+210,COLORS.WHITE);
+% %         
+%         %Test if getting better or worse; display feedback?
+%     end
+        DrawFormattedText(w,'Press any key to continue','center','center',COLORS.WHITE);
+%     DrawFormattedText(w,'Press any key to continue','center',wRect(4)*9/10,COLORS.WHITE);
     Screen('Flip',w);
     KbWait();
     
@@ -499,12 +482,12 @@ WaitSecs(.5);                              %Jitter this for fMRI purposes.
 % locations. Otherwise, just display them...hence, no additional if/thens
     if DPB.var.img(trial,block)== 1;
         %Display AVG pic on LEFT
-        Screen('DrawTexture',w,PICS.out(trial).texture_avg,[],STIM.img(lr,:));
-        Screen('DrawTexture',w,PICS.out(trial).texture_thin,[],STIM.img(notlr,:));
+        Screen('DrawTexture',w,PICS.out(trial).texture_H,[],STIM.img(lr,:));
+        Screen('DrawTexture',w,PICS.out(trial).texture_T,[],STIM.img(notlr,:));
     else
         %Otherwise, display AVG on RIGHT
-        Screen('DrawTexture',w,PICS.out(trial).texture_thin,[],STIM.img(lr,:));
-        Screen('DrawTexture',w,PICS.out(trial).texture_avg,[],STIM.img(notlr,:));
+        Screen('DrawTexture',w,PICS.out(trial).texture_T,[],STIM.img(lr,:));
+        Screen('DrawTexture',w,PICS.out(trial).texture_H,[],STIM.img(notlr,:));
     end
 
     Screen('Flip',w);
@@ -585,32 +568,49 @@ global PICS DPB w STIM
     for j = 1:STIM.trials;
         if DPB.var.exp(j,block) == 1;
         
-        %Get pic # for given trial's hi & low cal food
-        pic_thin = DPB.var.picnum_avg(j,block);
-        pic_avg = DPB.var.picnum_thin(j,block);
-        PICS.out(j).raw_avg = imread(getfield(PICS,'in','avg',{pic_thin},'name'));
-        PICS.out(j).raw_thin = imread(getfield(PICS,'in','thin',{pic_avg},'name'));
-        PICS.out(j).texture_avg = Screen('MakeTexture',w,PICS.out(j).raw_avg);
-        PICS.out(j).texture_thin = Screen('MakeTexture',w,PICS.out(j).raw_thin);
+        %Get pic # for given trial's H pic
+        pic_H = DPB.var.picnum_H(j,block);
+        pic_T = DPB.var.picnum_T(j,block);
+        Hname = PICS.in.H(pic_H).name;
+        Tname = PICS.in.T(pic_T).name;
+        PICS.out(j).raw_H = imread(Hname);
+        PICS.out(j).raw_T = imread(Tname);
+        PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
+        PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
         
-        else
+        else %this is control trial; Check if it should be H or T
+            
             if DPB.var.img(j,block) == 1;
-                %Display AVG pics.
-                pic_thin = DPB.var.picnum_avg(j,block);
-                pic_avg = DPB.var.picnum_thin(j,block);
-                PICS.out(j).raw_avg = imread(getfield(PICS,'in','avg',{pic_thin},'name'));
-                PICS.out(j).raw_thin = imread(getfield(PICS,'in','avg',{pic_avg},'name'));
-                PICS.out(j).texture_avg = Screen('MakeTexture',w,PICS.out(j).raw_avg);
-                PICS.out(j).texture_thin = Screen('MakeTexture',w,PICS.out(j).raw_thin);
+                %Display H pics.
+                pic_H = DPB.var.picnum_H(j,block);
+                Hname = PICS.in.H(pic_H).name;
+                
+                %find race matched image to display
+                race_check = sprintf('%s.*_H(?!%s).*jpg',Hname(1:2),Hname(end-6:end-4));
+                race_pics = regexpi({PICS.in.H.name},race_check,'match');
+                race_pics = [race_pics{:}];
+                Hname2 = race_pics{randi(length(race_pics))};
+
+                PICS.out(j).raw_H = imread(Hname);
+                PICS.out(j).raw_T = imread(Hname2);
+                PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
+                PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
                 
             elseif DPB.var.img(j,block) == 2;
                 %Display THIN pics.
-                pic_thin = DPB.var.picnum_avg(j,block);
-                pic_avg = DPB.var.picnum_thin(j,block);
-                PICS.out(j).raw_avg = imread(getfield(PICS,'in','thin',{pic_thin},'name'));
-                PICS.out(j).raw_thin = imread(getfield(PICS,'in','thin',{pic_avg},'name'));
-                PICS.out(j).texture_avg = Screen('MakeTexture',w,PICS.out(j).raw_avg);
-                PICS.out(j).texture_thin = Screen('MakeTexture',w,PICS.out(j).raw_thin);
+                pic_T = DPB.var.picnum_H(j,block);
+                Tname = PICS.in.T(pic_T).name;
+                
+                %find race matched image to display
+                race_check = sprintf('%s.*_T(?!%s).*jpg',Tname(1:2),Tname(end-6:end-4));
+                race_pics = regexpi({PICS.in.T.name},race_check,'match');
+                race_pics = [race_pics{:}];
+                Tname2 = race_pics{randi(length(race_pics))};
+
+                PICS.out(j).raw_H = imread(Tname);
+                PICS.out(j).raw_T = imread(Tname2);
+                PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
+                PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
             end
         end
         
