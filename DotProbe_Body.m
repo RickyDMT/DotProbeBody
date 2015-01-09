@@ -31,7 +31,7 @@ prac = str2double(answer{4});
 
 
 rng(ID); %Seed random number generator with subject ID
-d = clock;
+ddd = clock;
 
 KEY = struct;
 KEY.rt = KbName('SPACE');
@@ -55,19 +55,20 @@ STIM.totes = STIM.blocks*STIM.trials;
 STIM.trialdur = 1.250;
 STIM.exp_trials = 80;
 STIM.cont_trials = 40;
+STIM.jitter = [.5 1 2];
 
 
 %% Find & load in pics
 %find the image directory by figuring out where the .m is kept
 
-[imgdir,~,~] = fileparts(which('MasterPics_PlaceHolder.m'));
+[imgdir,~,~] = fileparts(which('ModelPairPics.m'));
 
 cd(imgdir);
  
 PICS =struct;
     % Update for appropriate pictures.
-     PICS.in.H = dir('H*');
-     PICS.in.T = dir('T*');
+     PICS.in.H = dir('*_H*');
+     PICS.in.T = dir('*_T*');
 
      %Check if pictures are present. If not, throw error.
 %Could be updated to search computer to look for pics...
@@ -91,6 +92,9 @@ probe = [probe; repmat([1;2],20,1)];
 img = [img; ones(20,1); repmat(2,20,1)];
 exp = [ones(STIM.exp_trials,1); zeros(STIM.cont_trials,1)];
 
+%jitter
+jit = BalanceTrials(STIM.totes,1,STIM.jitter);
+
 %Make long list of randomized #s to represent each pic in experimental
 %trials
 %First check to see how many repeats are needed.
@@ -103,29 +107,64 @@ else
     piclist_H = randperm(length(PICS.in.H))';
     %Then add as many more as needed to reach full 80 trials.
     piclist = [piclist_H; randi(length(PICS.in.H),picdiff,1)];
+%     piclist = [piclist piclist];  %80x2 for Pic1 + Pic2 numbers.
 
 end
 
 %Come up with pics for control trials
-piclist = [piclist; randi(length(PICS.in.H),20,1); randi(length(PICS.in.T),20,1)];
-    
-%List pic names!
+piclist_c = [randi(length(PICS.in.H),20,1); randi(length(PICS.in.T),20,1)];
+% piclist_c = [piclist_c NaN(40,1)];
+piclist = [piclist; piclist_c];
 
 %Block & trial numbers:
-[b, t] = BalanceTrials(STIM.totes,0,[1:STIM.blocks],[1:STIM.trials]);
+[b, t] = BalanceTrials(STIM.totes,0,1:STIM.blocks,1:STIM.trials);
 %Concatenate these into a long list of trial types.
 trial_types = [probe img exp piclist];
 shuffled = trial_types(randperm(size(trial_types,1)),:);
-trial_types = [b t shuffled];
+trial_types = [b t shuffled jit];
+
+%List pic names!  Produce list for 80 exp trials and 40 control trials
+%separately; mash them together.
+
+PicNames = cell(length(trial_types),2);
+for d = 1:length(trial_types);
+    if trial_types(d,5) == 1;  %It's an experimental trial
+        PicNames{d,1} = PICS.in.H(trial_types(d,6)).name;
+        pic2 = PicNames{d,1};
+        pic2(end-7) = 'T';
+        PicNames{d,2} = pic2;
+    elseif trial_types(d,5) == 0; %It's a control!
+        if trial_types(d,4) == 1;   %display 2 equivalent H pics
+            PicNames{d,1} = PICS.in.H(trial_types(d,6)).name;
+            pic1name = PicNames{d,1};
+            %find race matched image to display
+            race_check = sprintf('%s.*_H(?!%s).*jpg',pic1name(1:2),pic1name(end-6:end-4));
+            race_pics = regexpi({PICS.in.H.name},race_check,'match');
+            race_pics = [race_pics{:}];
+            PicNames{d,2} = race_pics{randi(length(race_pics))};
+        elseif trial_types(d,4) == 2;   %display 2 equivalent T pics
+            PicNames{d,1} = PICS.in.T(trial_types(d,6)).name;
+            pic1name = PicNames{d,1};
+            %find race matched image to display
+            race_check = sprintf('%s.*_T(?!%s).*jpg',pic1name(1:2),pic1name(end-6:end-4));
+            race_pics = regexpi({PICS.in.T.name},race_check,'match');
+            race_pics = [race_pics{:}];
+            PicNames{d,2} = race_pics{randi(length(race_pics))};
+        end
+    end
+end
+
+ 
 
 for g = 1:STIM.blocks;
     row = ((g-1)*STIM.trials)+1;
     rend = row+STIM.trials - 1;
     DPB.var.probe(1:STIM.trials,g) = shuffled(row:rend,1);
-    DPB.var.picnum_H(1:STIM.trials,g) = shuffled(row:rend,4);
-    DPB.var.picnum_T(1:STIM.trials,g) = shuffled(row:rend,5);
+    DPB.var.picname1(1:STIM.trials,g) = PicNames(row:rend,1);
+    DPB.var.picname2(1:STIM.trials,g) = PicNames(row:rend,2);
     DPB.var.img(1:STIM.trials,g) = shuffled(row:rend,2);
     DPB.var.exp(1:STIM.trials,g) = shuffled(row:rend,3);
+    DPB.var.jit(1:STIM.trials,g) = trial_types(row:rend,7);
 end
 
     DPB.data.rt = zeros(STIM.trials, STIM.blocks);
@@ -134,7 +173,7 @@ end
     DPB.data.info.ID = ID;
 %     DPB.data.info.cond = COND;               %Condtion 1 = Food; Condition 2 = animals
     DPB.data.info.session = SESS;
-    DPB.data.info.date = sprintf('%s %2.0f:%02.0f',date,d(4),d(5));
+    DPB.data.info.date = sprintf('%s %2.0f:%02.0f',date,ddd(4),ddd(5));
     
 
 
@@ -219,7 +258,7 @@ STIM.probe(2,1:4) = [wRect(3)*(3/4) - dpr,wRect(4)/2 - dpr, wRect(3)*(3/4) + dpr
 %% Initial screen
 DrawFormattedText(w,'Welcome to the Dot-Probe Task.\nPress any key to continue.','center','center',COLORS.WHITE,[],[],[],1.5);
 Screen('Flip',w);
-% KbWait();
+KbWait();
 Screen('Flip',w);
 WaitSecs(1);
 
@@ -236,95 +275,95 @@ if prac == 1;
     DrawFormattedText(w,' Let''s practice.\n\nPress any key to continue.','center','center',COLORS.WHITE);
     Screen('Flip',w);
     KbWait([],2);
-    
-    
-    %Load random hi cal & low cal pic
-    rand_prac_pic = randi(length(PICS.in.H));
-    practpic_lo = imread(getfield(PICS,'in','lo',{rand_prac_pic},'name'));
-    practpic_hi = imread(getfield(PICS,'in','hi',{rand_prac_pic},'name'));
-    practpic_lo = Screen('MakeTexture',w,practpic_lo);
-    practpic_hi = Screen('MakeTexture',w,practpic_hi);
-    
-    %Display pic on left to show go signal and "left" key.
-%     Screen('FrameRect',w,COLORS.rect,STIM.framerect,6);
-%     Screen('DrawTexture',w,practpic,[],STIM.img(1,:));
-% Basic Instructions:
-    DrawFormattedText(w,'You will first see two images on the left & right side of the screen, followed by a dot under one of the images.\n\n Press any key to continue.','center','center',COLORS.WHITE,60,[],[],1.5);
-    Screen('Flip',w);
-    WaitSecs(.5);
-    KbWait();
-        
-    %Do this practice trial
-    Screen('DrawTexture',w,practpic_lo,[],STIM.img(1,:));
-    Screen('DrawTexture',w,practpic_hi,[],STIM.img(2,:));
-    Screen('Flip',w);
-    WaitSecs(.5);
-    
-    Screen('FillOval',w,COLORS.WHITE,STIM.probe(1,:));
-    pract_text = sprintf('In this trial you would press "%s" because the dot is on the left side.',KbName(KEY.left));
-    DrawFormattedText(w,pract_text,'center','center',COLORS.WHITE,25,[],[],1.2,[],STIM.img(2,:));
-    pract_textc = sprintf('Press "%s" now.',KbName(KEY.left));
-    DrawFormattedText(w,pract_textc,'center',wRect(4)-200,COLORS.WHITE);
-    Screen('Flip',w);
-    
-    commandwindow;
-    WaitSecs(2);
-    while 1
-        FlushEvents();
-        [d, ~, c] = KbCheck();            %wait for left key to be pressed
-        if d == 1 && find(c) == KEY.left
-            break;
-        else
-            FlushEvents();
-        end
-    end
-    
-    %Display probe on Right to show use of "right" key.
-    Screen('DrawTexture',w,practpic_lo,[],STIM.img(1,:));
-    Screen('DrawTexture',w,practpic_hi,[],STIM.img(2,:));
-    Screen('Flip',w);
-    WaitSecs(.5);
-    Screen('FillOval',w,COLORS.WHITE,STIM.probe(2,:));   
-    pract_text = sprintf('And in this trial you would press "%s" because the dot is on the right.',KbName(KEY.right));
-    DrawFormattedText(w,pract_text,'center','center',COLORS.WHITE,25,[],[],1.2,[],STIM.img(1,:));
-    pract_textc = sprintf('Press "%s" now.',KbName(KEY.right));
-    DrawFormattedText(w,pract_textc,'center',wRect(4)-200,COLORS.WHITE);
-    Screen('Flip',w);
-    while 1
-        FlushEvents();
-        [dd, ~, cc] = KbCheck();            %wait for "right" key to be pressed
-        if dd == 1 && find(cc) == KEY.right
-            break;
-        else
-            FlushEvents();
-        end
-    end
-    Screen('Flip',w);
-    WaitSecs(1);
-    
-    %Now do "no go" signal trial. 
-    PsychPortAudio('FillBuffer', pahandle, wave);
-    DrawFormattedText(w,'In some trials you will hear a short tone (a beep).','center','center',COLORS.WHITE,[],[],[],1.2);
-    DrawFormattedText(w,'Press any key to hear the tone.','center',wRect(4)-200,COLORS.WHITE);
-    Screen('Flip',w);
-    KbWait();
-    Screen('DrawTexture',w,practpic_lo,[],STIM.img(1,:));
-    Screen('DrawTexture',w,practpic_hi,[],STIM.img(2,:));
-    Screen('Flip',w);
-    WaitSecs(.5);
-    Screen('FillOval',w,COLORS.WHITE,STIM.probe(1,:));
-    
-    PsychPortAudio('Start', pahandle, 1);
-    %WaitSecs(.25);
-    %PsychPortAudio('Stop', pahandle);
-    pract_text = sprintf('If you hear a tone like this, do not press either key! Just wait & the next round will begin.');
-    DrawFormattedText(w,pract_text,'center','center',COLORS.WHITE,35,[],[],1.2,[],STIM.img(2,:));
-    Screen('Flip',w,[],1);
-    WaitSecs(2);
-    DrawFormattedText(w,'Press any key to continue.','center',wRect(4)-200,COLORS.WHITE);
-    Screen('Flip',w);
-    KbWait();
-    WaitSecs(2);
+% %     
+% %     
+% %     %Load random hi cal & low cal pic
+% %     rand_prac_pic = randi(length(PICS.in.H));
+% %     practpic_lo = imread(getfield(PICS,'in','lo',{rand_prac_pic},'name'));
+% %     practpic_hi = imread(getfield(PICS,'in','hi',{rand_prac_pic},'name'));
+% %     practpic_lo = Screen('MakeTexture',w,practpic_lo);
+% %     practpic_hi = Screen('MakeTexture',w,practpic_hi);
+% %     
+% %     %Display pic on left to show go signal and "left" key.
+% % %     Screen('FrameRect',w,COLORS.rect,STIM.framerect,6);
+% % %     Screen('DrawTexture',w,practpic,[],STIM.img(1,:));
+% % % Basic Instructions:
+% %     DrawFormattedText(w,'You will first see two images on the left & right side of the screen, followed by a dot under one of the images.\n\n Press any key to continue.','center','center',COLORS.WHITE,60,[],[],1.5);
+% %     Screen('Flip',w);
+% %     WaitSecs(.5);
+% %     KbWait();
+% %         
+% %     %Do this practice trial
+% %     Screen('DrawTexture',w,practpic_lo,[],STIM.img(1,:));
+% %     Screen('DrawTexture',w,practpic_hi,[],STIM.img(2,:));
+% %     Screen('Flip',w);
+% %     WaitSecs(.5);
+% %     
+% %     Screen('FillOval',w,COLORS.WHITE,STIM.probe(1,:));
+% %     pract_text = sprintf('In this trial you would press "%s" because the dot is on the left side.',KbName(KEY.left));
+% %     DrawFormattedText(w,pract_text,'center','center',COLORS.WHITE,25,[],[],1.2,[],STIM.img(2,:));
+% %     pract_textc = sprintf('Press "%s" now.',KbName(KEY.left));
+% %     DrawFormattedText(w,pract_textc,'center',wRect(4)-200,COLORS.WHITE);
+% %     Screen('Flip',w);
+% %     
+% %     commandwindow;
+% %     WaitSecs(2);
+% %     while 1
+% %         FlushEvents();
+% %         [d, ~, c] = KbCheck();            %wait for left key to be pressed
+% %         if d == 1 && find(c) == KEY.left
+% %             break;
+% %         else
+% %             FlushEvents();
+% %         end
+% %     end
+% %     
+% %     %Display probe on Right to show use of "right" key.
+% %     Screen('DrawTexture',w,practpic_lo,[],STIM.img(1,:));
+% %     Screen('DrawTexture',w,practpic_hi,[],STIM.img(2,:));
+% %     Screen('Flip',w);
+% %     WaitSecs(.5);
+% %     Screen('FillOval',w,COLORS.WHITE,STIM.probe(2,:));   
+% %     pract_text = sprintf('And in this trial you would press "%s" because the dot is on the right.',KbName(KEY.right));
+% %     DrawFormattedText(w,pract_text,'center','center',COLORS.WHITE,25,[],[],1.2,[],STIM.img(1,:));
+% %     pract_textc = sprintf('Press "%s" now.',KbName(KEY.right));
+% %     DrawFormattedText(w,pract_textc,'center',wRect(4)-200,COLORS.WHITE);
+% %     Screen('Flip',w);
+% %     while 1
+% %         FlushEvents();
+% %         [dd, ~, cc] = KbCheck();            %wait for "right" key to be pressed
+% %         if dd == 1 && find(cc) == KEY.right
+% %             break;
+% %         else
+% %             FlushEvents();
+% %         end
+% %     end
+% %     Screen('Flip',w);
+% %     WaitSecs(1);
+% %     
+% %     %Now do "no go" signal trial. 
+% %     PsychPortAudio('FillBuffer', pahandle, wave);
+% %     DrawFormattedText(w,'In some trials you will hear a short tone (a beep).','center','center',COLORS.WHITE,[],[],[],1.2);
+% %     DrawFormattedText(w,'Press any key to hear the tone.','center',wRect(4)-200,COLORS.WHITE);
+% %     Screen('Flip',w);
+% %     KbWait();
+% %     Screen('DrawTexture',w,practpic_lo,[],STIM.img(1,:));
+% %     Screen('DrawTexture',w,practpic_hi,[],STIM.img(2,:));
+% %     Screen('Flip',w);
+% %     WaitSecs(.5);
+% %     Screen('FillOval',w,COLORS.WHITE,STIM.probe(1,:));
+% %     
+% %     PsychPortAudio('Start', pahandle, 1);
+% %     %WaitSecs(.25);
+% %     %PsychPortAudio('Stop', pahandle);
+% %     pract_text = sprintf('If you hear a tone like this, do not press either key! Just wait & the next round will begin.');
+% %     DrawFormattedText(w,pract_text,'center','center',COLORS.WHITE,35,[],[],1.2,[],STIM.img(2,:));
+% %     Screen('Flip',w,[],1);
+% %     WaitSecs(2);
+% %     DrawFormattedText(w,'Press any key to continue.','center',wRect(4)-200,COLORS.WHITE);
+% %     Screen('Flip',w);
+% %     KbWait();
+% %     WaitSecs(2);
 end 
   
 %% Task
@@ -458,7 +497,7 @@ end
 %%
 function [trial_rt, correct] = DoDotProbeTraining(trial,block,varargin)
 
-global w STIM PICS COLORS DPB KEY pahandle
+global w STIM PICS COLORS DPB KEY
 
 correct = -999;                         %Set/reset "correct" to -999 at start of every trial
 lr = DPB.var.probe(trial,block);           %Bring in L/R location for probe; 1 = L, 2 = R
@@ -473,21 +512,21 @@ else
     notlr = 1;
 end
 
-%Display fixation for 500 ms
+%Display fixation for jittered ms
 DrawFormattedText(w,'+','center','center',COLORS.WHITE);
 Screen('Flip',w);
-WaitSecs(.5);                              %Jitter this for fMRI purposes.
+WaitSecs(DPB.var.jit(trial,block));  %Jitter this for fMRI purposes.
 
 % If this is an experimental trial, display AVG & Thin in appropriate
 % locations. Otherwise, just display them...hence, no additional if/thens
     if DPB.var.img(trial,block)== 1;
-        %Display AVG pic on LEFT
-        Screen('DrawTexture',w,PICS.out(trial).texture_H,[],STIM.img(lr,:));
-        Screen('DrawTexture',w,PICS.out(trial).texture_T,[],STIM.img(notlr,:));
+        %Display H pic on LEFT
+        Screen('DrawTexture',w,PICS.out(trial).texture1,[],STIM.img(lr,:));
+        Screen('DrawTexture',w,PICS.out(trial).texture2,[],STIM.img(notlr,:));
     else
         %Otherwise, display AVG on RIGHT
-        Screen('DrawTexture',w,PICS.out(trial).texture_T,[],STIM.img(lr,:));
-        Screen('DrawTexture',w,PICS.out(trial).texture_H,[],STIM.img(notlr,:));
+        Screen('DrawTexture',w,PICS.out(trial).texture2,[],STIM.img(lr,:));
+        Screen('DrawTexture',w,PICS.out(trial).texture1,[],STIM.img(notlr,:));
     end
 
     Screen('Flip',w);
@@ -566,65 +605,63 @@ function DrawPics4Block(block,varargin)
 global PICS DPB w STIM
 
     for j = 1:STIM.trials;
-        if DPB.var.exp(j,block) == 1;
-        
-        %Get pic # for given trial's H pic
-        pic_H = DPB.var.picnum_H(j,block);
-        pic_T = DPB.var.picnum_T(j,block);
-        Hname = PICS.in.H(pic_H).name;
-        Tname = PICS.in.T(pic_T).name;
-        PICS.out(j).raw_H = imread(Hname);
-        PICS.out(j).raw_T = imread(Tname);
-        PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
-        PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
-        
-        else %this is control trial; Check if it should be H or T
-            
-            if DPB.var.img(j,block) == 1;
-                %Display H pics.
-                pic_H = DPB.var.picnum_H(j,block);
-                Hname = PICS.in.H(pic_H).name;
-                
-                %find race matched image to display
-                race_check = sprintf('%s.*_H(?!%s).*jpg',Hname(1:2),Hname(end-6:end-4));
-                race_pics = regexpi({PICS.in.H.name},race_check,'match');
-                race_pics = [race_pics{:}];
-                Hname2 = race_pics{randi(length(race_pics))};
-
-                PICS.out(j).raw_H = imread(Hname);
-                PICS.out(j).raw_T = imread(Hname2);
-                PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
-                PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
-                
-            elseif DPB.var.img(j,block) == 2;
-                %Display THIN pics.
-                pic_T = DPB.var.picnum_H(j,block);
-                Tname = PICS.in.T(pic_T).name;
-                
-                %find race matched image to display
-                race_check = sprintf('%s.*_T(?!%s).*jpg',Tname(1:2),Tname(end-6:end-4));
-                race_pics = regexpi({PICS.in.T.name},race_check,'match');
-                race_pics = [race_pics{:}];
-                Tname2 = race_pics{randi(length(race_pics))};
-
-                PICS.out(j).raw_H = imread(Tname);
-                PICS.out(j).raw_T = imread(Tname2);
-                PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
-                PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
-            end
-        end
-        
-%         switch DPB.var.trial_type(j,block)
-%             case {1}
-%                 PICS.out(j).raw = imread(getfield(PICS,'in','go',{pic},'name'));
-% %                 %I think this is is covered outside of switch/case
-% %                 PICS.out(j).texture = Screen('MakeTexture',w,PICS.out(j).raw);
-%             case {2}
-%                 PICS.out(j).raw = imread(getfield(PICS,'in','no',{pic},'name'));
-%             case {3}
-%                 PICS.out(j).raw = imread(getfield(PICS,'in','neut',{pic},'name'));
-%         end
+        PICS.out(j).raw1 = imread(char(DPB.var.picname1(j,block)));
+        PICS.out(j).raw2 = imread(char(DPB.var.picname2(j,block)));
+        PICS.out(j).texture1 = Screen('MakeTexture',w,PICS.out(j).raw1);
+        PICS.out(j).texture2 = Screen('MakeTexture',w,PICS.out(j).raw2);
     end
+    
+        
+%         if DPB.var.exp(j,block) == 1;
+%         
+%         %Get pic # for given trial's H pic
+%         pic_H = DPB.var.picnum_H(j,block);
+%         pic_T = DPB.var.picnum_T(j,block);
+%         Hname = PICS.in.H(pic_H).name;
+%         Tname = PICS.in.T(pic_T).name;
+%         PICS.out(j).raw_H = imread(Hname);
+%         PICS.out(j).raw_T = imread(Tname);
+%         PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
+%         PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
+%         
+%         else %this is control trial; Check if it should be H or T
+%             
+%             if DPB.var.img(j,block) == 1;
+%                 %Display H pics.
+%                 pic_H = DPB.var.picnum_H(j,block);
+%                 Hname = PICS.in.H(pic_H).name;
+%                 
+%                 %find race matched image to display
+%                 race_check = sprintf('%s.*_H(?!%s).*jpg',Hname(1:2),Hname(end-6:end-4));
+%                 race_pics = regexpi({PICS.in.H.name},race_check,'match');
+%                 race_pics = [race_pics{:}];
+%                 Hname2 = race_pics{randi(length(race_pics))};
+% 
+%                 PICS.out(j).raw_H = imread(Hname);
+%                 PICS.out(j).raw_T = imread(Hname2);
+%                 PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
+%                 PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
+%                 
+%             elseif DPB.var.img(j,block) == 2;
+%                 %Display THIN pics.
+%                 pic_T = DPB.var.picnum_H(j,block);
+%                 Tname = PICS.in.T(pic_T).name;
+%                 
+%                 %find race matched image to display
+%                 race_check = sprintf('%s.*_T(?!%s).*jpg',Tname(1:2),Tname(end-6:end-4));
+%                 race_pics = regexpi({PICS.in.T.name},race_check,'match');
+%                 race_pics = [race_pics{:}];
+%                 Tname2 = race_pics{randi(length(race_pics))};
+% 
+%                 PICS.out(j).raw_H = imread(Tname);
+%                 PICS.out(j).raw_T = imread(Tname2);
+%                 PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
+%                 PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
+%             end
+%         end
+%         
+% 
+%     end
 %end
 end
 
