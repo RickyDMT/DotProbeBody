@@ -241,17 +241,12 @@ KbName('UnifyKeyNames');
 %border = 20;
 dpr = 10; %radius of dot probe
 
-% STIM.framerect = [border; border; wRect(3)-border; wRect(4)-border];
-
-% This sets 'DrawLine' to draw dashed line.
-% Screen('LineStipple',w,1,5);
-
 %This sets location for L & R image display. Basically chooses a square
 %whose side=1/2 the vertical size of the screen & is vertically centered.
 %The square is then placed 1/10th the width of the screen from the L & R
 %edge.
-STIM.img(1,1:4) = [wRect(3)/15,wRect(4)/4,wRect(3)/15+wRect(4)/2,wRect(4)*(3/4)];                   %L - image rect
-STIM.img(2,1:4) = [(wRect(3)*(14/15))-wRect(4)/2,wRect(4)/4,wRect(3)*(14/15),wRect(4)*(3/4)];       %R - image rect
+STIM.img(1,1:4) = [wRect(3)/15,(wRect(4)/4)-150,wRect(3)/15+wRect(4)/2,wRect(4)*(3/4)+150];                   %L - image rect
+STIM.img(2,1:4) = [(wRect(3)*(14/15))-wRect(4)/2,(wRect(4)/4)-150,wRect(3)*(14/15),wRect(4)*(3/4)+150];       %R - image rect
 STIM.probe(1,1:4) = [wRect(3)/4 - dpr,wRect(4)/2 - dpr, wRect(3)/4 + dpr, wRect(4)/2 + dpr];        %L probe rect
 STIM.probe(2,1:4) = [wRect(3)*(3/4) - dpr,wRect(4)/2 - dpr, wRect(3)*(3/4) + dpr, wRect(4)/2 + dpr];    %R probe rect
 
