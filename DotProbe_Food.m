@@ -1,4 +1,4 @@
-function DotProbe_Body(varargin)
+function DotProbe_Food(varargin)
 % 12/21/14: Do you want the NoGo Sound too?  Commented out since it is not
 % mentioned in the Research Strategy Document.
 % 12/21/14: Control condition?
@@ -7,7 +7,7 @@ function DotProbe_Body(varargin)
 % 1/5/15: Needs real pics!
 % 1/7/15: HPair5, WPair11 missing Health pic (AKA H034, H035)
 
-global KEY COLORS w wRect XCENTER YCENTER PICS STIM DPB trial
+global KEY COLORS w wRect XCENTER YCENTER PICS STIM DPF trial
 
 prompt={'SUBJECT ID'};
 defAns={'4444'};
@@ -51,24 +51,24 @@ STIM.jitter = [.5 1 2];
 %% Find & load in pics
 %find the image directory by figuring out where the .m is kept
 
-[mdir,~,~] = fileparts(which('DotProbe_Body.m'));
+[mdir,~,~] = fileparts(which('DotProbe_Food.m'));
 imgdir = [mdir filesep 'Pics'];
 cd(imgdir);
  
 PICS =struct;
     % Update for appropriate pictures.
-     PICS.in.H = dir('*_H*');
-     PICS.in.T = dir('*_T*');
+     PICS.in.H = dir('Healthy*');
+     PICS.in.Un = dir('Binge*');
 
      %Check if pictures are present. If not, throw error.
 %Could be updated to search computer to look for pics...
-if isempty(PICS.in.H) || isempty(PICS.in.T) %|| isempty(PICS.in.neut)
+if isempty(PICS.in.H) || isempty(PICS.in.Un) %|| isempty(PICS.in.neut)
     error('Could not find pics. Please ensure pictures are found in a folder names IMAGES within the folder containing the .m task file.');
 end
 
 
 %% Fill in rest of pertinent info
-DPB = struct;
+DPF = struct;
 
 % probe: Location of probe is left (1) or right (2);
 % img: Whether H is on left (1) or right (2);
@@ -90,17 +90,18 @@ picdiff = STIM.exp_trials - length(PICS.in.H);
 if picdiff == 0;
     %do nothing, biotch
     piclist = randperm(length(PICS.in.H))';
-else
+elseif picdiff > 0;
     %start with simple randomized order of each H pic
     piclist_H = randperm(length(PICS.in.H))';
     %Then add as many more as needed to reach full 80 trials.
     piclist = [piclist_H; randi(length(PICS.in.H),picdiff,1)];
-%     piclist = [piclist piclist];  %80x2 for Pic1 + Pic2 numbers.
+else
+    piclist = randperm(length(PICS.in.H),STIM.exp_trials)';
 
 end
 
 %Come up with pics for control trials
-piclist_c = [randi(length(PICS.in.H),20,1); randi(length(PICS.in.T),20,1)];
+piclist_c = [randi(length(PICS.in.H),20,1); randi(length(PICS.in.Un),20,1)];
 % piclist_c = [piclist_c NaN(40,1)];
 piclist = [piclist; piclist_c];
 
@@ -118,26 +119,24 @@ PicNames = cell(length(trial_types),2);
 for d = 1:length(trial_types);
     if trial_types(d,5) == 1;  %It's an experimental trial
         PicNames{d,1} = PICS.in.H(trial_types(d,6)).name;
-        pic2 = PicNames{d,1};
-        pic2(end-7) = 'T';
-        PicNames{d,2} = pic2;
+        pic2 = randi(length(PICS.in.Un));
+        PicNames{d,2} = PICS.in.Un(pic2).name;
     elseif trial_types(d,5) == 0; %It's a control!
         if trial_types(d,4) == 1;   %display 2 equivalent H pics
             PicNames{d,1} = PICS.in.H(trial_types(d,6)).name;
-            pic1name = PicNames{d,1};
-            %find race matched image to display
-            race_check = sprintf('%s.*_H(?!%s).*jpg',pic1name(1:2),pic1name(end-6:end-4));
-            race_pics = regexpi({PICS.in.H.name},race_check,'match');
-            race_pics = [race_pics{:}];
-            PicNames{d,2} = race_pics{randi(length(race_pics))};
+            pic2 = randi(length(PICS.in.H));
+            while trial_types(d,6) == pic2
+                pic2 = randi(length(PICS.in.H));
+            end
+            PicNames{d,2} = PICS.in.H(pic2).name;
+            
         elseif trial_types(d,4) == 2;   %display 2 equivalent T pics
-            PicNames{d,1} = PICS.in.T(trial_types(d,6)).name;
-            pic1name = PicNames{d,1};
-            %find race matched image to display
-            race_check = sprintf('%s.*_T(?!%s).*jpg',pic1name(1:2),pic1name(end-6:end-4));
-            race_pics = regexpi({PICS.in.T.name},race_check,'match');
-            race_pics = [race_pics{:}];
-            PicNames{d,2} = race_pics{randi(length(race_pics))};
+            PicNames{d,1} = PICS.in.Un(trial_types(d,6)).name;
+            pic2 = randi(length(PICS.in.Un));
+            while trial_types(d,6) == pic2
+                pic2 = randi(length(PICS.in.Un));
+            end
+            PicNames{d,2} = PICS.in.Un(pic2).name;
         end
     end
 end
@@ -147,19 +146,19 @@ end
 for g = 1:STIM.blocks;
     row = ((g-1)*STIM.trials)+1;
     rend = row+STIM.trials - 1;
-    DPB.var.probe(1:STIM.trials,g) = shuffled(row:rend,1);
-    DPB.var.picname1(1:STIM.trials,g) = PicNames(row:rend,1);
-    DPB.var.picname2(1:STIM.trials,g) = PicNames(row:rend,2);
-    DPB.var.img(1:STIM.trials,g) = shuffled(row:rend,2);
-    DPB.var.exp(1:STIM.trials,g) = shuffled(row:rend,3);
-    DPB.var.jit(1:STIM.trials,g) = trial_types(row:rend,7);
+    DPF.var.probe(1:STIM.trials,g) = shuffled(row:rend,1);
+    DPF.var.picname1(1:STIM.trials,g) = PicNames(row:rend,1);
+    DPF.var.picname2(1:STIM.trials,g) = PicNames(row:rend,2);
+    DPF.var.img(1:STIM.trials,g) = shuffled(row:rend,2);
+    DPF.var.exp(1:STIM.trials,g) = shuffled(row:rend,3);
+    DPF.var.jit(1:STIM.trials,g) = trial_types(row:rend,7);
 end
 
-    DPB.data.rt = zeros(STIM.trials, STIM.blocks);
-    DPB.data.correct = zeros(STIM.trials, STIM.blocks)-999;
-    DPB.data.avg_rt = zeros(STIM.blocks,1);
-    DPB.data.info.ID = ID;
-    DPB.data.info.date = sprintf('%s %2.0f:%02.0f',date,ddd(4),ddd(5));
+    DPF.data.rt = zeros(STIM.trials, STIM.blocks);
+    DPF.data.correct = zeros(STIM.trials, STIM.blocks)-999;
+    DPF.data.avg_rt = zeros(STIM.blocks,1);
+    DPF.data.info.ID = ID;
+    DPF.data.info.date = sprintf('%s %2.0f:%02.0f',date,ddd(4),ddd(5));
     
 
 
@@ -216,8 +215,9 @@ dpr = 10; %radius of dot probe
 %whose side=1/2 the vertical size of the screen & is vertically centered.
 %The square is then placed 1/10th the width of the screen from the L & R
 %edge.
-STIM.img(1,1:4) = [wRect(3)/15,(wRect(4)/4)-150,wRect(3)/15+wRect(4)/2,wRect(4)*(3/4)+150];                   %L - image rect
-STIM.img(2,1:4) = [(wRect(3)*(14/15))-wRect(4)/2,(wRect(4)/4)-150,wRect(3)*(14/15),wRect(4)*(3/4)+150];       %R - image rect
+STIM.img(1,1:4) = [wRect(3)/15,(wRect(4)/4),wRect(3)/15+600,(wRect(4)/4)+450];                   %L - image rect
+STIM.img(2,1:4) = [(wRect(3)*(14/15))-600,(wRect(4)/4),wRect(3)*(14/15),(wRect(4)/4)+450];       %R - image rect
+
 STIM.probe(1,1:4) = [wRect(3)/4 - dpr,wRect(4)/2 - dpr, wRect(3)/4 + dpr, wRect(4)/2 + dpr];        %L probe rect
 STIM.probe(2,1:4) = [wRect(3)*(3/4) - dpr,wRect(4)/2 - dpr, wRect(3)*(3/4) + dpr, wRect(4)/2 + dpr];    %R probe rect
 
@@ -252,7 +252,7 @@ for block = 1:STIM.blocks;
     old = Screen('TextSize',w,80);
 %     PsychPortAudio('FillBuffer', pahandle, wave);
     for trial = 1:STIM.trials;
-        [DPB.data.rt(trial,block), DPB.data.correct(trial,block)] = DoDotProbeTraining(trial,block);
+        [DPF.data.rt(trial,block), DPF.data.correct(trial,block)] = DoDotProbeTraining(trial,block);
         %Wait 500 ms
         Screen('Flip',w);
         WaitSecs(.5);
@@ -272,25 +272,25 @@ end
 
 savedir = [mdir filesep 'Results' filesep];
 cd(savedir)
-savename = ['DPB_' num2str(ID) '.mat'];
+savename = ['DPF_' num2str(ID) '.mat'];
 
 if exist(savename,'file')==2;
-    savename = ['DPB_' num2str(ID) '_' sprintf('%s_%2.0f%02.0f',date,d(4),d(5)) '.mat'];
+    savename = ['SocialComp_' num2str(ID) '_' sprintf('%s_%2.0f%02.0f',date,d(4),d(5)) '.mat'];
 end
 
 try
-save([savedir savename],'DPB');
+save([savedir savename],'DPF');
 catch
     warning('Something is amiss with this save. Retrying to save in a more general location...');
     try
-        save([mdir filesep savename],'DPB');
+        save([mdir filesep savename],'DPF');
     catch
-        warning('STILL problems saving....Try right-clicking on ''DPB'' and Save as...');
-        DPB
+        warning('STILL problems saving....Try right-clicking on ''DPF'' and Save as...');
+        DPF
     end
 end
 %Clear everything except data structure
-% clearvar -except DPB
+% clearvar -except DPF
 
 DrawFormattedText(w,'Thank you for your responses. This task is now complete. Please notify the assessor.','center','center',COLORS.WHITE,60,[],[],1.5);
 Screen('Flip',w);
@@ -303,10 +303,10 @@ end
 %%
 function [trial_rt, correct] = DoDotProbeTraining(trial,block,varargin)
 
-global w STIM PICS COLORS DPB KEY
+global w STIM PICS COLORS DPF KEY
 
 correct = -999;                         %Set/reset "correct" to -999 at start of every trial
-lr = DPB.var.probe(trial,block);           %Bring in L/R location for probe; 1 = L, 2 = R
+lr = DPF.var.probe(trial,block);           %Bring in L/R location for probe; 1 = L, 2 = R
 
 if lr == 1;                             %set up response keys for probe (& not picture)
     corr_respkey = KEY.left;
@@ -321,11 +321,11 @@ end
 %Display fixation for jittered ms
 DrawFormattedText(w,'+','center','center',COLORS.WHITE);
 Screen('Flip',w);
-WaitSecs(DPB.var.jit(trial,block));  %Jitter this for fMRI purposes.
+WaitSecs(DPF.var.jit(trial,block));  %Jitter this for fMRI purposes.
 
 % If this is an experimental trial, display AVG & Thin in appropriate
 % locations. Otherwise, just display them...hence, no additional if/thens
-    if DPB.var.img(trial,block)== 1;
+    if DPF.var.img(trial,block)== 1;
         %Display H pic on LEFT
         Screen('DrawTexture',w,PICS.out(trial).texture1,[],STIM.img(lr,:));
         Screen('DrawTexture',w,PICS.out(trial).texture2,[],STIM.img(notlr,:));
@@ -340,10 +340,6 @@ WaitSecs(DPB.var.jit(trial,block));  %Jitter this for fMRI purposes.
     
     Screen('FillOval',w,COLORS.WHITE,STIM.probe(lr,:));
     RT_start = Screen('Flip',w);
-%     if DPB.var.signal(trial, block) == 1;
-%         PsychPortAudio('Start', pahandle, 1);
-%         % XXX: Delay between probe & signal onset?
-%     end
     telap = GetSecs() - RT_start;
 
 
@@ -356,20 +352,6 @@ WaitSecs(DPB.var.jit(trial,block));  %Jitter this for fMRI purposes.
                 Screen('Flip',w);
                 correct = 1;
 
-                
-% This is for beep NoGo signal
-%                 if DPB.var.signal(trial,block) == 1;        %This is a no-go signal round. Throw incorrect X.
-%                     DrawFormattedText(w,'X','center','center',COLORS.RED);
-%                     Screen('Flip',w);
-%                     correct = 0;
-%                     WaitSecs(.5);
-% 
-%                 else                                        %If no signal + Press, move on to next round.
-%                     Screen('Flip',w);                        %'Flip' in order to clear buffer; next flip (in main script) flips to black screen.
-%                     correct = 1;
-%                 
-%                 end
-            
             elseif any(find(Code) == incorr_respkey) %The wrong key was pressed. Throw X regardless of Go/No Go
                 trial_rt = GetSecs() - RT_start;
                 
@@ -387,17 +369,10 @@ WaitSecs(DPB.var.jit(trial,block));  %Jitter this for fMRI purposes.
     end
     
     if correct == -999;
-%     Screen('DrawTexture',w,PICS.out(trial).texture,[],STIM.img(lr,:));
-        
-%         if DPB.var.signal(trial,block) == 1;    %NoGo Trial + Correct no press. Do nothing, move to inter-trial
-%             Screen('Flip',w);                   %'Flip' in order to clear buffer; next flip (in main script) flips to black screen.
-%             correct = 1;
-%         else                                    %Incorrect no press. Show "X" for .5 sec.
             DrawFormattedText(w,'X','center','center',COLORS.RED);
             Screen('Flip',w);
             correct = 0;
             WaitSecs(.5);
-%         end
         trial_rt = -999;                        %No press = no RT
     end
     
@@ -408,66 +383,16 @@ end
 %%
 function DrawPics4Block(block,varargin)
 
-global PICS DPB w STIM
+global PICS DPF w STIM
 
     for j = 1:STIM.trials;
-        PICS.out(j).raw1 = imread(char(DPB.var.picname1(j,block)));
-        PICS.out(j).raw2 = imread(char(DPB.var.picname2(j,block)));
+        PICS.out(j).raw1 = imread(char(DPF.var.picname1(j,block)));
+        PICS.out(j).raw2 = imread(char(DPF.var.picname2(j,block)));
         PICS.out(j).texture1 = Screen('MakeTexture',w,PICS.out(j).raw1);
         PICS.out(j).texture2 = Screen('MakeTexture',w,PICS.out(j).raw2);
     end
     
         
-%         if DPB.var.exp(j,block) == 1;
-%         
-%         %Get pic # for given trial's H pic
-%         pic_H = DPB.var.picnum_H(j,block);
-%         pic_T = DPB.var.picnum_T(j,block);
-%         Hname = PICS.in.H(pic_H).name;
-%         Tname = PICS.in.T(pic_T).name;
-%         PICS.out(j).raw_H = imread(Hname);
-%         PICS.out(j).raw_T = imread(Tname);
-%         PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
-%         PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
-%         
-%         else %this is control trial; Check if it should be H or T
-%             
-%             if DPB.var.img(j,block) == 1;
-%                 %Display H pics.
-%                 pic_H = DPB.var.picnum_H(j,block);
-%                 Hname = PICS.in.H(pic_H).name;
-%                 
-%                 %find race matched image to display
-%                 race_check = sprintf('%s.*_H(?!%s).*jpg',Hname(1:2),Hname(end-6:end-4));
-%                 race_pics = regexpi({PICS.in.H.name},race_check,'match');
-%                 race_pics = [race_pics{:}];
-%                 Hname2 = race_pics{randi(length(race_pics))};
-% 
-%                 PICS.out(j).raw_H = imread(Hname);
-%                 PICS.out(j).raw_T = imread(Hname2);
-%                 PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
-%                 PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
-%                 
-%             elseif DPB.var.img(j,block) == 2;
-%                 %Display THIN pics.
-%                 pic_T = DPB.var.picnum_H(j,block);
-%                 Tname = PICS.in.T(pic_T).name;
-%                 
-%                 %find race matched image to display
-%                 race_check = sprintf('%s.*_T(?!%s).*jpg',Tname(1:2),Tname(end-6:end-4));
-%                 race_pics = regexpi({PICS.in.T.name},race_check,'match');
-%                 race_pics = [race_pics{:}];
-%                 Tname2 = race_pics{randi(length(race_pics))};
-% 
-%                 PICS.out(j).raw_H = imread(Tname);
-%                 PICS.out(j).raw_T = imread(Tname2);
-%                 PICS.out(j).texture_H = Screen('MakeTexture',w,PICS.out(j).raw_H);
-%                 PICS.out(j).texture_T = Screen('MakeTexture',w,PICS.out(j).raw_T);
-%             end
-%         end
-%         
-% 
-%     end
-%end
+
 end
 
